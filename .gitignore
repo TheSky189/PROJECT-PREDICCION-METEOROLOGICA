@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Secrets
+.env
+
+# Data lake (no subir datos crudos ni procesados)
+data/
+
+# OS
+.DS_Store
+Thumbs.db
