@@ -2,6 +2,11 @@ import glob
 import pandas as pd
 import streamlit as st
 from datetime import datetime
+import os, glob
+from streamlit_autorefresh import st_autorefresh
+st_autorefresh(interval=5 * 60 * 1000, key="auto_refresh")
+
+
 
 PARQUET_DIR = "data/processed/aemet/municipio_diaria_parquet"
 PRED_CSV = "data/predictions/temp_max_forecast.csv"
@@ -101,6 +106,18 @@ if not files:
     st.stop()
 
 df = pd.read_parquet(PARQUET_DIR)
+# --- Fix: asegurar que dt es datetime (a veces se lee como Categorical) ---
+if "dt" in df.columns:
+    # Convertir a string primero para evitar Categorical issues
+    df["dt"] = pd.to_datetime(df["dt"].astype(str), errors="coerce")
+else:
+    # Si dt no viene como columna (por partición), intentamos recuperarlo desde el índice si aplica
+    df = df.reset_index()
+    if "dt" in df.columns:
+        df["dt"] = pd.to_datetime(df["dt"].astype(str), errors="coerce")
+
+# Eliminar filas sin fecha válida
+df = df.dropna(subset=["dt"])
 df["dt"] = pd.to_datetime(df["dt"])
 df = df.sort_values("dt")
 
@@ -126,17 +143,36 @@ st.markdown(f"""
 st.write("")
 
 # ============ Filters ============
-with st.container():
-    c1, c2, c3 = st.columns([1,1,2])
-    with c1:
-        start = st.date_input("Desde", value=df["dt"].min().date())
-    with c2:
-        end = st.date_input("Hasta", value=df["dt"].max().date())
-    with c3:
-        show_table = st.toggle("Mostrar tabla completa", value=False)
+# Calcular fechas mínimas y máximas de forma segura
+min_dt = pd.to_datetime(df["dt"].astype(str), errors="coerce").min()
+max_dt = pd.to_datetime(df["dt"].astype(str), errors="coerce").max()
 
-mask = (df["dt"].dt.date >= start) & (df["dt"].dt.date <= end)
-dff = df.loc[mask].copy()
+with st.container():
+    c_refresh, c_toggle = st.columns([1, 3])
+
+    with c_refresh:
+        if st.button("🔄 Actualizar datos (AEMET)"):
+            with st.spinner("Actualizando datos desde AEMET..."):
+                os.system("python fetch_aemet_barcelona.py")
+                os.system("python spark_etl_aemet.py")
+                os.system("python model_train_predict.py")
+            st.success("Datos actualizados correctamente")
+
+            try:
+                st.rerun()
+            except AttributeError:
+                st.experimental_rerun()
+
+    with c_toggle:
+        show_table = st.toggle("Mostrar tabla completa", value=False)
+    
+
+
+
+
+#mask = (df["dt"].dt.date >= start) & (df["dt"].dt.date <= end)
+#dff = df.loc[mask].copy()
+dff = df.copy()
 
 # Eliminar duplicados por fecha (quedarnos con la última carga)
 if "fecha_carga" in dff.columns:
@@ -206,7 +242,16 @@ if os.path.exists(PRED_CSV):
 
 # ============ Forecast Cards ============
 st.subheader("🗓️ Resumen (7 días)")
-top7 = dff.head(7)
+
+from datetime import date
+hoy = pd.to_datetime(date.today()).normalize()
+
+dff_sorted = dff.sort_values("dt").copy()
+top7 = dff_sorted[dff_sorted["dt"] >= hoy].head(7)
+
+if top7.empty:
+    top7 = dff_sorted.head(7)
+
 cols = st.columns(7 if len(top7) >= 7 else max(1, len(top7)))
 for i in range(len(cols)):
     if i >= len(top7):
@@ -224,8 +269,6 @@ for i in range(len(cols)):
           <div class="fline"><span class="badge">{row['estado_cielo']}</span></div>
         </div>
         """, unsafe_allow_html=True)
-
-st.write("")
 
 
 # ============ Charts ============
