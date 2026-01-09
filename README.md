@@ -137,5 +137,13 @@ El dashboard desarrollado con Streamlit permite:
 * El pipeline está diseñado de forma **modular**, facilitando futuras ampliaciones.
 * El modelo de predicción puede evolucionar incorporando más variables o algoritmos más avanzados.
 
+### Dashboard features
+
+- Automatic visualization of short-term meteorological predictions (AEMET)
+- Manual data refresh button to update the complete data pipeline
+- 7-day summary aligned with the current date
+- Interactive charts and optional table inspection
+
+
 
 
