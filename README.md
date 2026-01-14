@@ -111,15 +111,43 @@ P3_METEO_BIGDATA/
 - Sistema operativo: Windows / macOS / Linux
 
 
+## Activar entorno virtual (venv)
+Antes de ejecutar el proyecto es obligatorio crear y activar un entorno virtual de Python, para aislar las dependencias del sistema.
+
+  - 1. Crear el entorno virtual (solo la primera vez)
+       `python -m venv .venv`
+        Esto creará una carpeta `.venv/` con el entorno virtual del proyecto.
+
+  - 2. Activar el entorno virtual
+      macOS / Linux
+      `source .venv/bin/activate`
+      Windows (PowerShell)
+      `.venv\Scripts\Activate.ps1`
+
+      Cuando el entorno esté activo, el terminal mostrará algo similar a:
+      `(.venv)`
+
+  - 3. Detener Streamlit
+        Para cerrar la aplicación Streamlit, usa:
+        CTRL + C  en el terminal donde se esté ejecutando.
+
+  - 4. Salir del entorno virtual
+        Cuando hayas terminado de trabajar con el proyecto:
+        `deactivate` - Esto cerrará el entorno virtual y devolverá el terminal al estado normal.
+      
+
+
 ## Configuración de la API Key (AEMET)
 
 Para acceder a AEMET OpenData es necesario configurar una **variable de entorno** con tu clave personal.
+Es opcional, la clave esta incluido dentro del py fetch.
 
 ### macOS / Linux
 `export AEMET_API_KEY="TU_API_KEY"`
 
-Windows (PowerShell)
+### Windows (PowerShell)
 `setx AEMET_API_KEY "TU_API_KEY"`
+
 
 
 ## Ejecución del sistema
