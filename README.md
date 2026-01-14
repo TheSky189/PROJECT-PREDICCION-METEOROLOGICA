@@ -71,6 +71,7 @@ El sistema utiliza un enfoque **modular**, con modelos supervisados diferenciado
 
 ## Estructura del proyecto
 
+```text
 P3_METEO_BIGDATA/
 │
 ├─ data/
@@ -99,7 +100,7 @@ P3_METEO_BIGDATA/
 ├─ run_pipeline.sh
 ├─ .gitignore
 └─ README.md
-
+```
 
 
 ## ⚙️ Requisitos del sistema
