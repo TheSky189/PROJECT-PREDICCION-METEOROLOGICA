@@ -1,157 +1,175 @@
-# P3 Meteo BigData (Barcelona) — Predicción Meteorológica con AEMET + Spark ETL + Modelos
+# Proyecto 3 — Predicción Meteorológica Big Data
 
 Autores: **Jiajiao Xu** y **Jordi Vidal**  
 Proyecto: **P3 Meteo BigData**  
 Ciudad objetivo: **Barcelona** (AEMET OpenData)
 
-
-## 1. Objetivo del proyecto
-
-El objetivo principal es construir un **pipeline Big Data** capaz de:
-
-1) **Extraer datos meteorológicos históricos** (temperatura, precipitación, humedad, etc.) desde **AEMET OpenData** durante varios años.  
-2) **Procesar y estructurar** los datos con un flujo **ETL** (Raw JSON → Spark → Parquet).  
-3) Entrenar **modelos predictivos** basados en años anteriores para realizar predicción de:
-   - **Temperatura (máxima / mínima / media)**  
-   - **Probabilidad de lluvia** (clasificación)  
-   - **Cantidad de precipitación (mm)** (regresión, solo si llueve)  
-   - **Humedad media**
-
-4) Visualizar resultados en un **Dashboard con Streamlit**.
+Proyecto de análisis y predicción meteorológica desarrollado como parte del **Proyecto 3 – Big Data**, utilizando datos oficiales de **AEMET OpenData**, un pipeline Big Data con **Apache Spark**, modelos de **Machine Learning supervisado** y un **dashboard interactivo en Streamlit**.
 
 
-## 2. Fuente de datos
+## Descripción general
 
-- **AEMET OpenData**
-- Datos históricos descargados (ejemplo):
-  - `RAW`: `data/raw/aemet/clima_diaria/aemet_*.json`
-  - `PARQUET`: `data/processed/aemet/clima_diaria_parquet`
-  - Rango confirmado:
-    - `min_dt = 2022-01-01`
-    - `max_dt = 2025-12-31`
+El sistema implementa un flujo completo de datos que abarca:
 
+- Ingesta de datos desde una API oficial
+- Proceso ETL con Apache Spark
+- Almacenamiento optimizado en formato Parquet
+- Modelado predictivo (clasificación y regresión)
+- Evaluación mediante métricas y backtesting
+- Visualización interactiva orientada a usuario final
 
-## 3. Arquitectura del pipeline
-
-### 3.1 Flujo general
-
-**AEMET → Raw JSON → Spark ETL → Parquet → Modelos → Predicción → Dashboard**
-
-- **Ingesta** (Raw):
-  - `fetch_aemet_barcelona.py` descarga los JSON mensuales desde AEMET.
-- **ETL**:
-  - `spark_etl_aemet.py` transforma/limpia los JSON y genera Parquet particionado.
-- **Modelos**:
-  - `model_advanced_train_predict.py` entrena y genera predicciones para los próximos 7 días.
-- **Dashboard**:
-  - `app_streamlit.py` visualiza datos y predicciones.
+El proyecto se centra en el municipio de **Barcelona**, utilizando como referencia la estación meteorológica **Barcelona – Fabra (0200E)**.
 
 
-## 4. Estructura del proyecto
+## Datos utilizados
 
-`P3_METEO_BIGDATA/
+- **Fuente:** AEMET OpenData  
+- **Tipo de datos históricos:** Climatología diaria por estación (observaciones)
+- **Rango temporal del histórico:**  
+  - Desde: **2022-01-01**  
+  - Hasta: **2025-12-31**
+- **Variables principales:**
+  - Temperatura máxima, mínima y media
+  - Humedad relativa media
+  - Precipitación diaria
+  - Fecha de observación
+  - Identificación de estación
+
+Las **predicciones** se generan dinámicamente para los **7 días posteriores a la fecha de ejecución**, por lo que pueden aparecer fechas del año siguiente (por ejemplo, 2026).
+
+
+## Modelos predictivos
+
+El sistema utiliza un enfoque **modular**, con modelos supervisados diferenciados según la naturaleza de la variable:
+
+### 🌧️ Predicción de lluvia (clasificación)
+- Modelo: Clasificación supervisada
+- Salida: Probabilidad de lluvia
+- Métrica principal: **ROC-AUC**
+- Interpretación orientada a usuario:
+  - `< 40%` → No
+  - `40–60%` → Posible
+  - `> 60%` → Probable
+
+### Predicción de variables continuas (regresión)
+- Variables: temperatura, humedad y precipitación
+- Modelo avanzado: **Random Forest**
+- Feature engineering:
+  - Variables temporales
+  - Lags históricos
+  - Medias móviles (rolling)
+- Métrica principal: **MAE**
+
+### Evaluación
+- Backtesting temporal sobre los últimos **120 días**
+- Resultados aproximados:
+  - Temperatura máxima: MAE ≈ 1.8 °C
+  - Temperatura mínima: MAE ≈ 1.4 °C
+  - Humedad media: MAE ≈ 9 %
+  - Lluvia: AUC ≈ 0.75
+
+
+## Estructura del proyecto
+
+P3_METEO_BIGDATA/
+│
 ├─ data/
-│ ├─ raw/
-│ │ └─ aemet/
-│ │ └─ clima_diaria/
-│ │ └─ aemet_*.json
-│ ├─ processed/
-│ │ └─ aemet/
-│ │ ├─ clima_diaria_parquet/
-│ │ └─ municipio_diaria_parquet/ (opcional: predicción oficial AEMET 8 días)
-│ └─ predictions/
-│ ├─ forecast_advanced_7d.csv
-│ ├─ temp_max_forecast.csv (legacy)
-│ └─ rain_forecast.csv (legacy)
+│  ├─ raw/                       # Datos originales (JSON AEMET)
+│  │  └─ aemet/
+│  │     └─ clima_diaria/
+│  │        └─ aemet_*.json
+│  │
+│  ├─ processed/                 # Datos procesados (Parquet)
+│  │  └─ aemet/
+│  │     ├─ clima_diaria_parquet/
+│  │     └─ municipio_diaria_parquet/
+│  │        (opcional: predicción oficial AEMET 8 días)
+│  │
+│  └─ predictions/               # Resultados de los modelos (CSV)
+│     ├─ forecast_advanced_7d.csv
+│     ├─ temp_max_forecast.csv   (legacy)
+│     └─ rain_forecast.csv       (legacy)
 │
 ├─ fetch_aemet_barcelona.py
 ├─ spark_etl_aemet.py
-├─ model_advanced_train_predict.py
+├─ rain_train_predict.py
+├─ model_train_predict.py            # Modelo baseline
+├─ model_advanced_train_predict.py   # Modelo avanzado actual
 ├─ app_streamlit.py
 ├─ run_pipeline.sh
 ├─ .gitignore
-└─ README.md`
+└─ README.md
 
 
-## 5. Modelado y predicción (avanzado)
 
-### 5.1 Variables disponibles (dataset histórico)
+## ⚙️ Requisitos del sistema
 
-Columnas principales:
-- `temp_max`, `temp_min`, `temp_med`
-- `precip` (mm)
-- `hum_med` (%)
-- `dt` (fecha)
-
-### 5.2 Features utilizados
-
-Se generan **features temporales + retardos (lags)** y medias móviles (rolling), por ejemplo:
-- Día de la semana, mes
-- Lags de 1/2/3/7 días para temp/precip/humedad
-- Rolling mean (7 días) para variables clave
-
-### 5.3 Salidas del modelo
-
-Se genera un fichero:
-- `data/predictions/forecast_advanced_7d.csv`
-
-Contiene:
-- `pred_temp_max`, `pred_temp_min`, `pred_temp_med`
-- `pred_hum_med`
-- `rain_prob` (probabilidad)
-- `rain_level` (Posible / Probable / Alta)
-- `rain_pred` (0/1 con umbral)
-- `pred_precip_mm` (mm esperados si llueve)
-- `rain_icon` (icono UI)
-
-### 5.4 Evaluación (Backtest)
-
-Ejemplo de salida:
-- Temp (últimos 120 días):
-  - MAE temp_max ~ 1.8
-  - MAE temp_min ~ 1.4
-  - MAE temp_med ~ 1.5
-- Lluvia (últimos 120 días):
-  - AUC ~ 0.75
-- Precipitación (mm, solo días con lluvia):
-  - MAE ~ 5 mm
+- Python **3.10** o superior
+- Java **JDK 17**
+- Apache Spark (modo local)
+- Sistema operativo: Windows / macOS / Linux
 
 
-## 6. Cómo ejecutar el proyecto
+## Configuración de la API Key (AEMET)
 
-### 6.1 Requisitos
+Para acceder a AEMET OpenData es necesario configurar una **variable de entorno** con tu clave personal.
 
-- Python 3.11+ (entorno virtual recomendado)
-- Java (si Spark lo requiere en tu entorno)
-- Librerías principales:
-  - `pandas`, `requests`, `pyspark`, `streamlit`, `scikit-learn`
-
-### 6.2 Variables de entorno
-
-Configura tu API Key de AEMET:
+### macOS / Linux
 `export AEMET_API_KEY="TU_API_KEY"`
 
-6.3 Paso a paso
-Descargar histórico (ejemplo 2022–2025):
+Windows (PowerShell)
+`setx AEMET_API_KEY "TU_API_KEY"`
 
-python fetch_aemet_barcelona.py
-ETL con Spark → Parquet:
-`python spark_etl_aemet.py`
 
-Entrenar + predecir (modelo avanzado):
-`python model_advanced_train_predict.py`
+## Ejecución del sistema
 
-Lanzar dashboard:
-`streamlit run app_streamlit.py`
+Ejecución manual (pipeline completo)
+   - `python fetch_aemet_barcelona.py
+      python spark_etl_aemet.py
+      python rain_train_predict.py
+      python model_advanced_train_predict.py
+      streamlit run app_streamlit.py`
 
-7. Notas importantes (GitHub / tamaño datos)
-No subir .venv/ a GitHub.
+Ejecución automatizada
 
-No subir datasets pesados (data/raw, data/processed) si ocupan mucho.
+El proyecto incluye el script:
+   - `./run_pipeline.sh`
 
-Mantener el pipeline reproducible: al clonar el repo, se puede regenerar todo ejecutando los scripts.
+Este script ejecuta todo el pipeline, desde la descarga de datos hasta la actualización del dashboard.
 
-8. Licencia
-Uso académico (proyecto de clase).
-Datos fuente: AEMET OpenData.
+
+## Dashboard
+
+El cuadro de mandos desarrollado con Streamlit permite:
+
+   - Visualizar indicadores clave (KPIs)
+   - Consultar la predicción meteorológica a 7 días
+   - Analizar la evolución temporal de las variables
+   - Interpretar la probabilidad de lluvia mediante rangos (No / Posible /              Probable)
+   - Acceder opcionalmente a una vista analítica con los datos completos
+
+
+## Pruebas realizadas
+
+   - Prueba de adquisición de datos (API AEMET)
+   - Prueba de proceso ETL con Spark
+   - Validación de calidad de datos
+   - Evaluación de modelos mediante backtesting
+   - Verificación de generación de predicciones y visualización
+
+
+## Conclusiones
+
+El proyecto implementa con éxito un sistema completo de predicción meteorológica basado en una arquitectura Big Data, integrando procesamiento distribuido, modelado predictivo evaluado y visualización interpretativa.
+
+La solución es estable, reproducible y escalable, y puede ampliarse fácilmente a nuevos municipios, variables o entornos cloud.
+
+
+## Mejoras futuras
+
+- Ampliación del histórico de datos
+- Inclusión de nuevos municipios
+- Evaluación de modelos más avanzados
+- Automatización mediante tareas programadas
+- Despliegue en la nube
 
