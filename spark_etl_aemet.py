@@ -1,11 +1,12 @@
-import glob
-import os
 import sys
+import glob, os
+os.environ["SPARK_LOCAL_HOSTNAME"] = "localhost"
 
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import (
     col, to_date, regexp_replace, lit, when
 )
+
 
 # Lee TODOS los JSON históricos descargados (2022-2025)
 RAW_GLOB = "data/raw/aemet/clima_diaria/aemet_*.json"
@@ -35,7 +36,12 @@ def main():
 
 
     # 1) Leer JSON (son listas de dicts -> Spark lo maneja)
-    df = spark.read.option("multiLine", "true").json(RAW_GLOB)
+    files = glob.glob(os.path.join("data", "raw", "aemet", "clima_diaria", "aemet_*.json"))
+    if not files:
+        raise FileNotFoundError("No se han encontrado JSON en data/raw/aemet/clima_diaria (aemet_*.json)")
+
+    df = spark.read.option("multiLine", "true").json(files)
+
 
     if df.rdd.isEmpty():
         raise SystemExit(f"No se encontraron ficheros RAW con patrón: {RAW_GLOB}")
