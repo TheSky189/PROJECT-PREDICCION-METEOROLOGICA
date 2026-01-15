@@ -148,7 +148,7 @@ Es opcional, la clave esta incluido dentro del py fetch.
 ### Windows (PowerShell)
 `setx AEMET_API_KEY "TU_API_KEY"`
 
-
+API KEY: `eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJrZW5rYW5la2k5NHRnQGdtYWlsLmNvbSIsImp0aSI6ImIzOWJhNmVmLTBhMjYtNDcwYy1iNzY5LWU1MWNhMzZmZTg2OCIsImlzcyI6IkFFTUVUIiwiaWF0IjoxNzY3ODM2MTk1LCJ1c2VySWQiOiJiMzliYTZlZi0wYTI2LTQ3MGMtYjc2OS1lNTFjYTM2ZmU4NjgiLCJyb2xlIjoiIn0.Oeo2osJmfH9BSis9NOGJW_cQoDAAQG6XMmUhXZqkvq8`
 
 ## Ejecución del sistema
 
