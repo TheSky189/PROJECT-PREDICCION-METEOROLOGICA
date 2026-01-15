@@ -152,6 +152,9 @@ Es opcional, la clave esta incluido dentro del py fetch.
 
 ## Ejecución del sistema
 
+Instalar request
+   - `pip install requests`
+
 Ejecución manual (pipeline completo)
    - `python fetch_aemet_barcelona.py
       python spark_etl_aemet.py
