@@ -125,7 +125,7 @@ Incluye:
 
 ## 🎥 Video de presentación
 📺 Enlace al video:
-[Ver video de presentación]([https://youtu.be/XXXXXXXX](https://youtu.be/2l0_PF-NqrI))
+[Ver video de presentación](https://youtu.be/2l0_PF-NqrI)
 
 
 ## ⚙️ Requisitos del sistema
