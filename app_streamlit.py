@@ -6,6 +6,72 @@ import os, glob
 from streamlit_autorefresh import st_autorefresh
 st_autorefresh(interval=5 * 60 * 1000, key="auto_refresh")
 
+# --- Sidebar Header (para multipage) ---
+st.markdown("""
+<style>
+
+div[data-testid="stSidebarNav"] {
+    padding-top: 8px;
+}
+
+div[data-testid="stSidebarNav"] > ul > li:first-child {
+    margin-bottom: 12px;
+}
+
+div[data-testid="stSidebarNav"] > ul > li:first-child > div {
+    background: rgba(255,255,255,0.08);
+    border-radius: 10px;
+    padding: 6px 10px;
+    font-size: 13px;
+    opacity: 0.75;
+}
+
+div[data-testid="stSidebarNav"] li a {
+    border-radius: 10px;
+    padding: 8px 10px;
+    margin: 4px 0;
+    transition: background 0.15s ease;
+}
+
+div[data-testid="stSidebarNav"] li a:hover {
+    background: rgba(255,255,255,0.08);
+}
+
+div[data-testid="stSidebarNav"] li a[aria-current="page"] {
+    background: linear-gradient(
+        135deg,
+        rgba(70,130,180,0.35),
+        rgba(70,130,180,0.18)
+    );
+    font-weight: 600;
+    border-left: 4px solid #5DA9E9;
+    padding-left: 12px;
+}
+
+div[data-testid="stSidebarNav"] li a svg {
+    margin-right: 6px;
+}
+</style>
+""", unsafe_allow_html=True)
+
+
+st.sidebar.markdown("""
+<div class="sidebar-fixed-header">
+  <div class="wrap">
+    <img src="app/static/logo" style="display:none"/>
+    <div style="font-size:0;"></div>
+  </div>
+</div>
+""", unsafe_allow_html=True)
+
+# Header real (con st.sidebar.image)
+with st.sidebar:
+    # este bloque se "verá" arriba gracias al CSS fixed
+    st.image("document/logo_weather.png", width=78)
+    st.markdown('<div class="title">METEO DASHBOARD</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sub">Predicción meteorológica<br/>Big Data & IA</div>', unsafe_allow_html=True)
+    st.markdown("---")
+
 
 # ============ Load data (Parquet / CSV compatible) ============
 
@@ -18,6 +84,7 @@ df = None
 if os.path.exists(PARQUET_DIR):
     parquet_files = glob.glob(os.path.join(PARQUET_DIR, "**", "*.parquet"), recursive=True)
     if parquet_files:
+        data_source_note = ""
         df = pd.read_parquet(PARQUET_DIR)
         st.info("📦 Datos cargados desde Parquet (Spark)")
 
@@ -25,7 +92,7 @@ if os.path.exists(PARQUET_DIR):
 if df is None:
     if os.path.exists(CSV_FALLBACK):
         df = pd.read_csv(CSV_FALLBACK, parse_dates=["dt"])
-        st.info("🪟 Datos cargados desde CSV (Windows fallback)")
+        data_source_note = "🪟 Datos cargados desde CSV (Windows fallback)"
     else:
         st.error("❌ No se encontraron datos procesados. Ejecuta: python spark_etl_aemet.py")
         st.stop()
@@ -389,55 +456,15 @@ else:
             """, unsafe_allow_html=True)
 
 
+st.markdown("---")
+st.subheader("📝 Resumen")
 
-# ============ Charts ============
-st.subheader("📈 Visualización")
-c1, c2 = st.columns(2)
+st.write("""
+- Se observa una **tendencia estable de temperaturas** para los próximos días, coherente con el patrón estacional histórico.
+- La **probabilidad de precipitación** se mantiene moderada, con episodios puntuales de lluvia.
+- Las predicciones se basan en modelos supervisados entrenados con datos históricos de AEMET y **sirven como apoyo a la toma de decisiones**, no como predicción oficial.
+""")
 
-with c1:
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.write("Temperatura observada (máx / mín)")
-
-    # Serie real
-    chart_real = dff.set_index("dt")[["temp_max", "temp_min"]].copy()
-    st.line_chart(chart_real)
-
-    st.caption("Datos observados / previstos por AEMET (máx y mín diarios).")
-
-    # ======================
-    # Predicción separada
-    # ======================
-    import os
-    import pandas as pd
-
-    PRED_CSV = "data/predictions/temp_max_forecast.csv"
-
-    if os.path.exists(PRED_CSV):
-        st.write("Predicción temperatura máxima (modelo)")
-        pred_df = pd.read_csv(PRED_CSV)
-        pred_df["dt"] = pd.to_datetime(pred_df["dt"])
-        pred_df = pred_df.set_index("dt")[["pred_temp_max"]]
-
-        st.line_chart(pred_df)
-
-        st.caption(
-            "Predicción generada mediante un modelo avanzado (Random Forest) con ingeniería de características (variables temporales, lags y medias móviles). "
-            "Con pocos datos históricos, la tendencia es estable; mejora al acumular más datos."
-        )
-
-    st.markdown('</div>', unsafe_allow_html=True)
-
-
-
-with c2:
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.write("Precipitación diaria (mm)")
-    chart_pp = dff.set_index("dt")[["precip"]].copy()
-    chart_pp["precip"] = pd.to_numeric(chart_pp["precip"], errors="coerce").fillna(0.0)
-    st.bar_chart(chart_pp)
-    st.markdown('</div>', unsafe_allow_html=True)
-
-st.write("")
 
 # Optional table
 if show_table:
