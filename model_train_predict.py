@@ -13,7 +13,7 @@ def load_processed_data():
         df = pd.read_csv(csv_path, parse_dates=["dt"])
         return df
 
-    # mac/linux output (parquet)
+    # mac/linux output
     pq_dir = os.path.join("data", "processed", "aemet", "clima_diaria_parquet")
     if os.path.exists(pq_dir):
         df = pd.read_parquet(pq_dir)

@@ -9,7 +9,6 @@ df = pd.read_parquet(PARQUET_DIR)
 df["dt"] = pd.to_datetime(df["dt"])
 df = df.sort_values("dt")
 
-# 只用 temp_max 做示范（temp_min 同理）
 # solo filas con temp_max no nulo
 y = df["temp_max"].astype(float).values
 X = np.arange(len(df)).reshape(-1, 1)
@@ -17,7 +16,6 @@ X = np.arange(len(df)).reshape(-1, 1)
 model = LinearRegression()
 model.fit(X, y)
 
-# 预测未来 3 天
 # predicción para los próximos 3 días
 future_steps = 3
 X_future = np.arange(len(df), len(df) + future_steps).reshape(-1, 1)
