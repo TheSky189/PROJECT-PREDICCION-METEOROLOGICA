@@ -91,6 +91,16 @@ P3_METEO_BIGDATA/
 │     ├─ temp_max_forecast.csv   (legacy)
 │     └─ rain_forecast.csv       (legacy)
 │
+├─ pages/
+│  ├─ 1_📈_Analisis_y_Graficas.py
+│  └─ 2_📊_PowerBI.py
+│
+├─document/
+│  ├─ powerbi/    #donde estan las graficas de los resultados de POWER BI
+│  ├─ ANÁLISIS Y PREDICCIÓN DE DATOS METEOROLÓGICOS.pptx
+│  ├─ P3_Meteo_BigData_Barcelona_Jiajiao_Jordi.pdf
+│  └─ logo_weather.png
+│
 ├─ fetch_aemet_barcelona.py
 ├─ spark_etl_aemet.py
 ├─ rain_train_predict.py
@@ -101,6 +111,21 @@ P3_METEO_BIGDATA/
 ├─ .gitignore
 └─ README.md
 ```
+Estas visualizaciones se utilizan como apoyo al análisis y a la presentación de resultados, y también están integradas en la aplicación Streamlit.
+
+
+## 📁 Documentación y presentación
+
+Toda la documentación relacionada con el trabajo se encuentra en la carpeta **`/document`** del repositorio.
+
+Incluye:
+-  **Presentación en PowerPoint** (`ANÁLISIS Y PREDICCIÓN DE DATOS METEOROLÓGICOS.pptx`)
+-  **Documento final en PDF**
+-  **Imágenes y gráficos generados con Power BI** (carpeta `document/powerbi`)
+
+## 🎥 Video de presentación
+📺 Enlace al video:
+[Ver video de presentación](https://youtu.be/XXXXXXXX)
 
 
 ## ⚙️ Requisitos del sistema
