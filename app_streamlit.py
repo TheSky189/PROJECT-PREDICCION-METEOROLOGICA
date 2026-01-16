@@ -7,8 +7,35 @@ from streamlit_autorefresh import st_autorefresh
 st_autorefresh(interval=5 * 60 * 1000, key="auto_refresh")
 
 
+# ============ Load data (Parquet / CSV compatible) ============
+
 PARQUET_DIR = "data/processed/aemet/clima_diaria_parquet"
-PRED_CSV = "data/predictions/temp_max_forecast.csv"
+CSV_FALLBACK = "data/processed/aemet/clima_diaria_processed.csv"
+
+df = None
+
+# Parquet (Mac / Linux)
+if os.path.exists(PARQUET_DIR):
+    parquet_files = glob.glob(os.path.join(PARQUET_DIR, "**", "*.parquet"), recursive=True)
+    if parquet_files:
+        df = pd.read_parquet(PARQUET_DIR)
+        st.info("📦 Datos cargados desde Parquet (Spark)")
+
+# CSV fallback (Windows)
+if df is None:
+    if os.path.exists(CSV_FALLBACK):
+        df = pd.read_csv(CSV_FALLBACK, parse_dates=["dt"])
+        st.info("🪟 Datos cargados desde CSV (Windows fallback)")
+    else:
+        st.error("❌ No se encontraron datos procesados. Ejecuta: python spark_etl_aemet.py")
+        st.stop()
+
+if "dt" not in df.columns:
+    st.error("❌ Columna 'dt' no encontrada")
+    st.stop()
+
+df["dt"] = pd.to_datetime(df["dt"], errors="coerce")
+df = df.dropna(subset=["dt"]).sort_values("dt")
 
 
 # ============ UI (CSS) ============
@@ -112,13 +139,8 @@ def emoji_by_precip(p):
         return "🌦️"
     return "☀️"
 
-# ============ Load data ============
-files = glob.glob(f"{PARQUET_DIR}/dt=*/**/*.parquet", recursive=True)
-if not files:
-    st.error("No se encontraron archivos Parquet. Ejecuta primero: python spark_etl_aemet.py")
-    st.stop()
 
-df = pd.read_parquet(PARQUET_DIR)
+
 # --- Fix: asegurar que dt es datetime (a veces se lee como Categorical) ---
 if "dt" in df.columns:
     # Convertir a string primero para evitar Categorical issues
@@ -128,6 +150,7 @@ else:
     df = df.reset_index()
     if "dt" in df.columns:
         df["dt"] = pd.to_datetime(df["dt"].astype(str), errors="coerce")
+
 
 # Eliminar filas sin fecha válida
 df = df.dropna(subset=["dt"])
@@ -161,8 +184,6 @@ df["hum_max"] = df["hum_med"]
 # estado_cielo no existe en este dataset histórico: dejar vacío
 # df["estado_cielo"] = ""
 
-
-df["estado_cielo"] = df["estado_cielo"].apply(estado_readable)
 
 # ============ Top bar ============
 # FIX muni (evitar iloc[0] vacío)

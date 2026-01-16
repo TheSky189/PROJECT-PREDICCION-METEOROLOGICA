@@ -1,93 +1,76 @@
+import os
 import sys
-import glob, os
+import glob
+import platform
+
 os.environ["SPARK_LOCAL_HOSTNAME"] = "localhost"
 
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import (
-    col, to_date, regexp_replace, lit, when
-)
+from pyspark.sql.functions import col, to_date, regexp_replace, lit, when
 
 
-# Lee TODOS los JSON históricos descargados (2022-2025)
-RAW_GLOB = "data/raw/aemet/clima_diaria/aemet_*.json"
+RAW_DIR = os.path.join("data", "raw", "aemet", "clima_diaria")
+RAW_GLOB = os.path.join(RAW_DIR, "aemet_*.json")
 
-# Nuevo parquet de históricos (para evitar mezclar con el antiguo de predicción)
-OUT_DIR = "data/processed/aemet/clima_diaria_parquet"
+
+def is_windows() -> bool:
+    return platform.system().lower().startswith("win")
+
+
+def to_double_safe(colname: str):
+    return regexp_replace(col(colname).cast("string"), ",", ".").cast("double")
+
 
 def main():
     spark = (
         SparkSession.builder
-        .appName("P3-AEMET-ETL-HISTORICO")
-        .master("local[*]")
+        .appName("AEMET_ETL")
+        .config("spark.pyspark.python", sys.executable)
+        .config("spark.pyspark.driver.python", sys.executable)
+        .config("spark.sql.warehouse.dir", os.path.join(os.getcwd(), "spark-warehouse"))
         .getOrCreate()
     )
 
     files = glob.glob(RAW_GLOB)
     if not files:
         print(f"❌ No se encontraron ficheros RAW: {RAW_GLOB}")
-        print("👉 Solución:")
-        print("   1) Exporta la API Key: export AEMET_API_KEY=\"TU_API_KEY\"")
-        print("   2) Ejecuta: python fetch_aemet_barcelona.py")
-        print("   3) Vuelve a ejecutar: python spark_etl_aemet.py")
+        print("👉 Ejecuta primero: python fetch_aemet_barcelona.py")
+        spark.stop()
         sys.exit(1)
 
     print(f"✅ RAW encontrados: {len(files)}")
     print(f"Ejemplo: {files[0]}")
 
-
-    # 1) Leer JSON (son listas de dicts -> Spark lo maneja)
-    files = glob.glob(os.path.join("data", "raw", "aemet", "clima_diaria", "aemet_*.json"))
-    if not files:
-        raise FileNotFoundError("No se han encontrado JSON en data/raw/aemet/clima_diaria (aemet_*.json)")
-
     df = spark.read.option("multiLine", "true").json(files)
 
-
-    if df.rdd.isEmpty():
-        raise SystemExit(f"No se encontraron ficheros RAW con patrón: {RAW_GLOB}")
+    sample = df.limit(1).collect()
+    if len(sample) == 0:
+        spark.stop()
+        raise SystemExit(f"❌ No hay datos al leer los JSON: {RAW_GLOB}")
 
     print("Schema RAW:")
     df.printSchema()
     df.show(5, truncate=False)
 
-    # 2) Normalización de campos
-    # En AEMET, algunos números vienen como string con coma decimal, ej: "12,3"
-    # También puede venir "Ip" (inapreciable) en precipitación.
-    def to_double_safe(c):
-        return regexp_replace(col(c).cast("string"), ",", ".").cast("double")
+    base = df.withColumn("dt", to_date(col("fecha")))
 
-    # Campos típicos (pueden variar según estación):
-    # fecha, tmax, tmin, tmed, prec, hrMedia, ...
-    # Vamos a crear columnas estándar para el modelo:
-    # - temp_max, temp_min, temp_med, precip
-    # - dt (date)
-    base = df
-
-    # Si alguna columna no existe, Spark lanzará error al seleccionarla.
-    # Por eso usamos when(col is not null) y revisa tu schema si hay nombres distintos.
-    base = base.withColumn("dt", to_date(col("fecha")))
-
-    # Temperaturas
     base = base.withColumn("temp_max", to_double_safe("tmax"))
     base = base.withColumn("temp_min", to_double_safe("tmin"))
     base = base.withColumn("temp_med", to_double_safe("tmed"))
 
-    # Precipitación: puede venir "Ip" o vacío -> lo convertimos a 0.0 o null (elige)
     prec_str = col("prec").cast("string")
     base = base.withColumn(
         "precip",
-        when(prec_str.isNull(), None)
+        when(prec_str.isNull(), lit(None).cast("double"))
         .when(prec_str == "Ip", lit(0.0))
-        .otherwise(regexp_replace(prec_str, ",", ".").cast("double"))
+        .otherwise(regexp_replace(prec_str, ",", ".").cast("double")),
     )
 
-    # Humedad media (si existe)
     if "hrMedia" in base.columns:
         base = base.withColumn("hum_med", to_double_safe("hrMedia"))
     else:
         base = base.withColumn("hum_med", lit(None).cast("double"))
 
-    # 3) Seleccionar columnas finales (mínimas para dashboard/modelo)
     out = base.select(
         "dt", "fecha",
         col("temp_max"),
@@ -97,25 +80,34 @@ def main():
         col("hum_med"),
         col("indicativo").alias("station_id"),
         col("nombre").alias("station_name"),
-        col("provincia")
+        col("provincia"),
     )
 
-    # 4) Guardar parquet (overwrite para empezar limpio)
-    os.makedirs(OUT_DIR, exist_ok=True)
-    (
-        out.write.mode("overwrite")
-        .partitionBy("dt")
-        .parquet(OUT_DIR)
-    )
+    out_dir = os.path.join("data", "processed", "aemet")
+    os.makedirs(out_dir, exist_ok=True)
 
-    print("\nETL OK")
-    print("RAW:", RAW_GLOB)
-    print("PARQUET:", OUT_DIR)
+    if is_windows():
+        # Windows: avoid Hadoop writer (winutils) -> use pandas output
+        pdf = out.orderBy("dt").toPandas()
+        out_path = os.path.join(out_dir, "clima_diaria_processed.csv")
+        pdf.to_csv(out_path, index=False, encoding="utf-8")
+        print("\n✅ ETL OK (WINDOWS, pandas CSV)")
+        print("SALIDA:", out_path)
+    else:
+        parquet_dir = os.path.join(out_dir, "clima_diaria_parquet")
+        (out.write
+            .mode("overwrite")
+            .partitionBy("dt")
+            .parquet(parquet_dir)
+        )
+        print("\n✅ ETL OK (PARQUET)")
+        print("SALIDA:", parquet_dir)
 
     out.selectExpr("min(dt) as min_dt", "max(dt) as max_dt").show()
     out.show(10, truncate=False)
 
     spark.stop()
+
 
 if __name__ == "__main__":
     main()
